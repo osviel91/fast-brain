@@ -117,9 +117,11 @@ Compaction endpoints:
 
 ```txt
 POST /v1/consolidate/session/{session_id}
+POST /v1/consolidate/session/{session_id}/retry-failed
 POST /v1/compact
 GET  /v1/stats
 GET  /v1/consolidate/pending
+GET  /v1/consolidate/failed
 ```
 
 Current consolidation uses an OpenAI-compatible summarizer when `SUMMARIZER_BASE_URL` and `SUMMARIZER_MODEL` are configured. Consolidation now claims only the pending message block that fits in `max_chars`, then marks only those message IDs as consolidated. Oversized single messages are marked `failed` instead of being silently truncated and treated as processed.
@@ -166,7 +168,17 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"agent_id":"hermes","kind":"summary","max_chars":3000,"max_sessions":10}' \
   "$FAST_BRAIN_URL/v1/compact"
+
+curl -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  "$FAST_BRAIN_URL/v1/consolidate/failed?agent_id=hermes"
+
+curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"hermes","kind":"summary","max_chars":12000}' \
+  "$FAST_BRAIN_URL/v1/consolidate/session/<session_id>/retry-failed"
 ```
+
+Run manual compaction first. Add automatic compaction only after the pending/failed reports are boring and predictable.
 
 The lazy rule: do not summarize everything all the time. Keep raw messages cheap, consolidate only inactive/old sessions, and inject only memories that semantic search says are relevant.
 
@@ -224,7 +236,9 @@ DELETE /v1/memories/{id}?agent_id=hermes
 POST /v1/search
 POST /v1/context
 GET  /v1/consolidate/pending?agent_id=hermes
+GET  /v1/consolidate/failed?agent_id=hermes
 POST /v1/consolidate/session/{session_id}
+POST /v1/consolidate/session/{session_id}/retry-failed
 POST /v1/compact
 POST /v1/consolidate
 ```

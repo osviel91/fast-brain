@@ -131,6 +131,46 @@ def pending_sessions(agent_id: str = "hermes", limit: int = 20) -> list[dict[str
     ]
 
 
+def failed_messages(agent_id: str = "hermes", limit: int = 20) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT m.id, m.session_id, m.role, left(m.content, 500), length(m.content), m.created_at
+            FROM messages m
+            JOIN sessions s ON s.id = m.session_id
+            WHERE s.agent_id = %s AND m.consolidation_status = 'failed'
+            ORDER BY m.id
+            LIMIT %s
+            """,
+            (agent_id, limit),
+        ).fetchall()
+    return [
+        {
+            "id": row[0],
+            "session_id": row[1],
+            "role": row[2],
+            "preview": row[3],
+            "chars": row[4],
+            "created_at": row[5],
+        }
+        for row in rows
+    ]
+
+
+def retry_failed_messages(session_id: str) -> int:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            UPDATE messages
+            SET consolidation_status = 'pending'
+            WHERE session_id = %s AND consolidation_status = 'failed'
+            RETURNING id
+            """,
+            (session_id,),
+        ).fetchall()
+    return len(row)
+
+
 def claim_unconsolidated_messages(session_id: str, max_chars: int) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(

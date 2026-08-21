@@ -8,11 +8,13 @@ from .schemas import CompactIn, ConsolidateIn, ContextIn, MemoryIn, MemoryOut, M
 from .store import (
     claim_unconsolidated_messages,
     delete_memory,
+    failed_messages,
     mark_consolidated,
     mark_failed,
     mark_pending,
     pending_sessions,
     recent_messages,
+    retry_failed_messages,
     save_memory,
     save_message,
     search_memories,
@@ -65,6 +67,11 @@ async def test_summarizer(request: SummarizerTestIn) -> dict[str, object]:
 @app.get("/v1/consolidate/pending", dependencies=[Depends(require_auth)])
 def get_pending(agent_id: str = "hermes", limit: int = 20) -> dict[str, object]:
     return {"sessions": pending_sessions(agent_id, limit)}
+
+
+@app.get("/v1/consolidate/failed", dependencies=[Depends(require_auth)])
+def get_failed(agent_id: str = "hermes", limit: int = 20) -> dict[str, object]:
+    return {"messages": failed_messages(agent_id, limit)}
 
 
 @app.post("/v1/messages", dependencies=[Depends(require_auth)])
@@ -128,6 +135,13 @@ def forget(memory_id: int, agent_id: str = "hermes") -> dict[str, object]:
 @app.post("/v1/consolidate/session/{session_id}", dependencies=[Depends(require_auth)])
 async def consolidate_session(session_id: str, request: ConsolidateIn) -> dict[str, object]:
     return await consolidate_one_session(session_id, request)
+
+
+@app.post("/v1/consolidate/session/{session_id}/retry-failed", dependencies=[Depends(require_auth)])
+async def retry_failed(session_id: str, request: ConsolidateIn) -> dict[str, object]:
+    retried = retry_failed_messages(session_id)
+    result = await consolidate_one_session(session_id, request) if retried else {"status": "empty", "messages": 0}
+    return {"retried": retried, "result": result}
 
 
 @app.post("/v1/compact", dependencies=[Depends(require_auth)])

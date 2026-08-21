@@ -29,6 +29,7 @@ Implemented:
 - Memory access tracking with `access_count` and `last_accessed_at`.
 - Basic context recommendation endpoint: `POST /v1/context`.
 - Public endpoint configured through `https://fb-memory.osviel.duckdns.org`.
+- Manual compaction through `/v1/compact` and per-session consolidation endpoints.
 
 ## Phase 1: Reliable Memory
 
@@ -38,8 +39,8 @@ Deliverables:
 
 - Verify Hermes writes full turns including tool messages.
 - Add a direct smoke command or script for memory provider checks.
-- Add a way to inspect failed consolidation messages.
-- Add a retry path for `consolidation_status = 'failed'`.
+- Inspect failed consolidation messages with `/v1/consolidate/failed`.
+- Retry failed messages with `/v1/consolidate/session/{session_id}/retry-failed`.
 - Avoid duplicate message storage across Hermes restarts if possible.
 
 Acceptance checks:
@@ -107,18 +108,28 @@ Acceptance checks:
 
 Purpose: reduce runtime context growth during long sessions.
 
+Manual flow first:
+
+1. Check `/v1/stats`.
+2. Check `/v1/consolidate/pending`.
+3. Run `/v1/compact` with a conservative `max_sessions`.
+4. Check `/v1/consolidate/failed`.
+5. Retry failed sessions only after choosing a larger `max_chars` or accepting that oversized tool outputs need separate handling.
+
 Deliverables:
 
 - Detect sessions with high pending message volume.
 - Compact old tool outputs into concise summaries.
 - Preserve current task, decisions, constraints and recent exchanges.
 - Add configurable retention for raw messages after safe consolidation.
+- Later: add automatic compaction once manual reports are stable.
 
 Acceptance checks:
 
 - Long sessions can be compacted without losing decisions.
 - Raw messages are retained until safely consolidated.
 - Context size does not grow without bound.
+- Automatic compaction does not run until manual compaction is proven safe.
 
 ## Phase 6: Agent-Agnostic Layer
 
@@ -154,6 +165,6 @@ Add these only when the simple HTTP/API flow is proven insufficient.
 
 1. Run a Hermes local memory smoke test through the FQDN.
 2. Confirm full message capture with at least one tool call.
-3. Add failed-consolidation inspection endpoint.
-4. Add retry endpoint for failed messages.
+3. Run manual `/v1/compact` against real Hermes sessions.
+4. Review `/v1/consolidate/failed` after compaction.
 5. Decide whether Hermes `prefetch` should switch from `/v1/search` to `/v1/context`.
