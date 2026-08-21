@@ -81,7 +81,7 @@ Plugin deployment note: any change under `plugins/fast-brain/` must be copied or
 
 Deliverables:
 
-- Update Hermes plugin `prefetch` to optionally use `/v1/context`.
+- Hermes plugin `prefetch` uses `/v1/context` with fallback to `/v1/search`.
 - Include recent messages plus retrieved memories in one compact block.
 - Add character budget configuration through env vars.
 - Skip oversized tool outputs by default.

@@ -72,7 +72,26 @@ class FastBrainProvider(MemoryProvider):
         )
 
     def prefetch(self, query: str, *, session_id: str = "") -> str:
-        results = self._request("POST", "/v1/search", {"query": query, "agent_id": self.agent_id, "limit": 5})
+        sid = session_id or self.session_id
+        try:
+            max_chars = int(os.environ.get("FAST_BRAIN_CONTEXT_MAX_CHARS", "6000"))
+        except ValueError:
+            max_chars = 6000
+        context = self._request(
+            "POST",
+            "/v1/context",
+            {
+                "query": query,
+                "agent_id": self.agent_id,
+                "session_id": sid,
+                "max_chars": max_chars,
+                "memory_limit": 5,
+                "recent_limit": 5,
+            },
+        )
+        results = context.get("memories", []) if isinstance(context, dict) and "error" not in context else []
+        if not results:
+            results = self._request("POST", "/v1/search", {"query": query, "agent_id": self.agent_id, "limit": 5})
         self._last_count = len(results) if isinstance(results, list) else 0
         if not self._last_count:
             return ""
