@@ -2,6 +2,8 @@
 
 Current plugin version: `0.2.0`.
 
+Traceability rule: every behavior change in this plugin must bump `plugin.yaml` and add a `CHANGELOG.md` entry before release.
+
 Install this directory into each Hermes profile:
 
 ```bash

@@ -45,6 +45,7 @@ docker compose up --build
 
 - Changes under `fast_brain/`, `migrations/`, `Dockerfile`, `compose.yaml`, or API docs require redeploying the fast-brain Docker service.
 - Changes under `plugins/fast-brain/` require updating every Hermes host/profile that has the plugin installed.
+- Changes under `plugins/fast-brain/` must also bump `plugins/fast-brain/plugin.yaml` and add an entry to `plugins/fast-brain/CHANGELOG.md` for traceability.
 - Changes to Hermes environment variables require updating that Hermes host and restarting the Hermes process/session.
 - Backend-only changes do not update already-installed Hermes plugins.
 

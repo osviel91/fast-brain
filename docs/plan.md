@@ -81,6 +81,8 @@ Purpose: make `/v1/context` the preferred context source for agents.
 
 Plugin deployment note: any change under `plugins/fast-brain/` must be copied or redeployed to every Hermes host/profile using that plugin. Backend redeploy alone is not enough.
 
+Plugin traceability note: every behavior change under `plugins/fast-brain/` must bump `plugin.yaml` and add a `CHANGELOG.md` entry.
+
 Deliverables:
 
 - Hermes plugin `prefetch` uses `/v1/context` with fallback to `/v1/search`.
