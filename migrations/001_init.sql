@@ -13,13 +13,19 @@ CREATE TABLE IF NOT EXISTS messages (
     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
     content TEXT NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    consolidation_status TEXT NOT NULL DEFAULT 'pending' CHECK (consolidation_status IN ('pending', 'processing', 'consolidated', 'failed')),
     consolidated_at TIMESTAMPTZ,
     consolidation_memory_id BIGINT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS consolidation_status TEXT NOT NULL DEFAULT 'pending';
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS consolidated_at TIMESTAMPTZ;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS consolidation_memory_id BIGINT;
+
+UPDATE messages SET consolidation_status = 'consolidated' WHERE consolidated_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS memories (
     id BIGSERIAL PRIMARY KEY,
@@ -29,13 +35,18 @@ CREATE TABLE IF NOT EXISTS memories (
     content TEXT NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     embedding vector(__EMBEDDING_DIMENSIONS__) NOT NULL,
+    access_count INTEGER NOT NULL DEFAULT 0,
+    last_accessed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE memories ADD COLUMN IF NOT EXISTS access_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE memories ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS memories_embedding_idx
 ON memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS memories_agent_idx ON memories(agent_id);
 CREATE INDEX IF NOT EXISTS messages_session_idx ON messages(session_id, id);
-CREATE INDEX IF NOT EXISTS messages_unconsolidated_idx ON messages(session_id, id) WHERE consolidated_at IS NULL;
+CREATE INDEX IF NOT EXISTS messages_unconsolidated_idx ON messages(session_id, id) WHERE consolidation_status = 'pending';

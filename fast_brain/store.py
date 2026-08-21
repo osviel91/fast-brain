@@ -6,7 +6,14 @@ from psycopg.types.json import Jsonb
 from .db import connect
 
 
-def save_message(session_id: str, role: str, content: str, agent_id: str, device_id: str | None) -> None:
+def save_message(
+    session_id: str,
+    role: str,
+    content: str,
+    agent_id: str,
+    device_id: str | None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
     with connect() as conn:
         conn.execute(
             """
@@ -17,8 +24,8 @@ def save_message(session_id: str, role: str, content: str, agent_id: str, device
             (session_id, agent_id, device_id),
         )
         conn.execute(
-            "INSERT INTO messages (session_id, role, content) VALUES (%s, %s, %s)",
-            (session_id, role, content),
+            "INSERT INTO messages (session_id, role, content, metadata) VALUES (%s, %s, %s, %s)",
+            (session_id, role, content, Jsonb(metadata or {})),
         )
 
 
@@ -51,18 +58,29 @@ def save_memory(
     return row[0]
 
 
-def search_memories(query_embedding: list[float], agent_id: str, limit: int) -> list[dict[str, Any]]:
+def search_memories(query_embedding: list[float], agent_id: str, limit: int, min_score: float = 0.25) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, content, kind, metadata, 1 - (embedding <=> %s) AS score
-            FROM memories
-            WHERE agent_id = %s
-            ORDER BY embedding <=> %s
+            WITH ranked AS (
+                SELECT id, content, kind, metadata, 1 - (embedding <=> %s) AS score
+                FROM memories
+                WHERE agent_id = %s
+            )
+            SELECT id, content, kind, metadata, score
+            FROM ranked
+            WHERE score >= %s
+            ORDER BY score DESC, id DESC
             LIMIT %s
             """,
-            (Vector(query_embedding), agent_id, Vector(query_embedding), limit),
+            (Vector(query_embedding), agent_id, min_score, limit),
         ).fetchall()
+        ids = [row[0] for row in rows]
+        if ids:
+            conn.execute(
+                "UPDATE memories SET access_count = access_count + 1, last_accessed_at = now() WHERE id = ANY(%s)",
+                (ids,),
+            )
     return [
         {"id": row[0], "content": row[1], "kind": row[2], "metadata": row[3], "score": row[4]}
         for row in rows
@@ -85,7 +103,7 @@ def stats(agent_id: str = "hermes") -> dict[str, int]:
             SELECT
                 (SELECT count(*) FROM sessions WHERE agent_id = %s),
                 (SELECT count(*) FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.agent_id = %s),
-                (SELECT count(*) FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.agent_id = %s AND m.consolidated_at IS NULL),
+                (SELECT count(*) FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.agent_id = %s AND m.consolidation_status = 'pending'),
                 (SELECT count(*) FROM memories WHERE agent_id = %s)
             """,
             (agent_id, agent_id, agent_id, agent_id),
@@ -100,7 +118,7 @@ def pending_sessions(agent_id: str = "hermes", limit: int = 20) -> list[dict[str
             SELECT s.id, count(m.id), min(m.created_at), max(m.created_at)
             FROM sessions s
             JOIN messages m ON m.session_id = s.id
-            WHERE s.agent_id = %s AND m.consolidated_at IS NULL
+            WHERE s.agent_id = %s AND m.consolidation_status = 'pending'
             GROUP BY s.id
             ORDER BY max(m.created_at)
             LIMIT %s
@@ -113,33 +131,61 @@ def pending_sessions(agent_id: str = "hermes", limit: int = 20) -> list[dict[str
     ]
 
 
-def unconsolidated_messages(session_id: str) -> list[dict[str, Any]]:
+def claim_unconsolidated_messages(session_id: str, max_chars: int) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, role, content
+            SELECT id, role, content, metadata
             FROM messages
-            WHERE session_id = %s AND consolidated_at IS NULL
+            WHERE session_id = %s AND consolidation_status = 'pending'
             ORDER BY id
             """,
             (session_id,),
         ).fetchall()
-    return [{"id": row[0], "role": row[1], "content": row[2]} for row in rows]
+        claimed = []
+        used = 0
+        for row in rows:
+            size = len(row[2]) + len(row[1]) + 2
+            if size > max_chars:
+                conn.execute("UPDATE messages SET consolidation_status = 'failed' WHERE id = %s", (row[0],))
+                continue
+            if claimed and used + size > max_chars:
+                break
+            claimed.append(row)
+            used += size
+        ids = [row[0] for row in claimed]
+        if ids:
+            conn.execute("UPDATE messages SET consolidation_status = 'processing' WHERE id = ANY(%s)", (ids,))
+    return [{"id": row[0], "role": row[1], "content": row[2], "metadata": row[3]} for row in claimed]
 
 
 def mark_consolidated(message_ids: list[int], memory_id: int) -> None:
     with connect() as conn:
         conn.execute(
-            "UPDATE messages SET consolidated_at = now(), consolidation_memory_id = %s WHERE id = ANY(%s)",
+            """
+            UPDATE messages
+            SET consolidation_status = 'consolidated', consolidated_at = now(), consolidation_memory_id = %s
+            WHERE id = ANY(%s)
+            """,
             (memory_id, message_ids),
         )
 
 
-def recent_messages(session_id: str, limit: int = 20) -> list[dict[str, str]]:
+def mark_pending(message_ids: list[int]) -> None:
+    with connect() as conn:
+        conn.execute("UPDATE messages SET consolidation_status = 'pending' WHERE id = ANY(%s)", (message_ids,))
+
+
+def mark_failed(message_ids: list[int]) -> None:
+    with connect() as conn:
+        conn.execute("UPDATE messages SET consolidation_status = 'failed' WHERE id = ANY(%s)", (message_ids,))
+
+
+def recent_messages(session_id: str, limit: int = 20) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT role, content
+            SELECT role, content, metadata
             FROM messages
             WHERE session_id = %s
             ORDER BY id DESC
@@ -147,4 +193,4 @@ def recent_messages(session_id: str, limit: int = 20) -> list[dict[str, str]]:
             """,
             (session_id, limit),
         ).fetchall()
-    return [{"role": role, "content": content} for role, content in reversed(rows)]
+    return [{"role": role, "content": content, "metadata": metadata} for role, content, metadata in reversed(rows)]

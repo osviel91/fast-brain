@@ -18,6 +18,7 @@ class FastBrainProvider(MemoryProvider):
         self.device_id = ""
         self.session_id = ""
         self._last_count = 0
+        self._synced_messages = 0
 
     @property
     def name(self) -> str:
@@ -35,6 +36,7 @@ class FastBrainProvider(MemoryProvider):
         self.agent_id = os.environ.get("FAST_BRAIN_AGENT_ID") or kwargs.get("agent_workspace") or "hermes"
         self.device_id = os.environ.get("FAST_BRAIN_DEVICE_ID") or kwargs.get("agent_identity") or "hermes"
         self.session_id = session_id
+        self._synced_messages = 0
 
     def get_config_schema(self) -> list[dict[str, Any]]:
         return [
@@ -93,28 +95,42 @@ class FastBrainProvider(MemoryProvider):
         sid = session_id or self.session_id
 
         def sync() -> None:
-            self._request(
-                "POST",
-                "/v1/messages",
-                {
-                    "session_id": sid,
-                    "role": "user",
-                    "content": user_content,
-                    "agent_id": self.agent_id,
-                    "device_id": self.device_id,
-                },
-            )
-            self._request(
-                "POST",
-                "/v1/messages",
-                {
-                    "session_id": sid,
-                    "role": "assistant",
-                    "content": assistant_content,
-                    "agent_id": self.agent_id,
-                    "device_id": self.device_id,
-                },
-            )
+            stored = False
+            runtime_messages = messages or []
+            start = self._synced_messages if len(runtime_messages) > self._synced_messages else 0
+            for index, message in enumerate(runtime_messages[start:], start=start):
+                role = message.get("role")
+                content = message.get("content")
+                if role not in {"user", "assistant", "system", "tool"} or content is None:
+                    continue
+                self._request(
+                    "POST",
+                    "/v1/messages",
+                    {
+                        "session_id": sid,
+                        "role": role,
+                        "content": content if isinstance(content, str) else json.dumps(content, ensure_ascii=False),
+                        "agent_id": self.agent_id,
+                        "device_id": self.device_id,
+                        "metadata": {key: value for key, value in message.items() if key not in {"role", "content"}} | {"turn_index": index},
+                    },
+                )
+                stored = True
+            if stored:
+                self._synced_messages = max(self._synced_messages, len(runtime_messages))
+                return
+            for role, content in (("user", user_content), ("assistant", assistant_content)):
+                self._request(
+                    "POST",
+                    "/v1/messages",
+                    {
+                        "session_id": sid,
+                        "role": role,
+                        "content": content,
+                        "agent_id": self.agent_id,
+                        "device_id": self.device_id,
+                    },
+                )
 
         threading.Thread(target=sync, daemon=True).start()
 

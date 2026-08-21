@@ -5,8 +5,10 @@ External semantic memory for Hermes agents.
 ## What It Does
 
 - Stores conversation messages by session.
+- Stores full agent messages when the runtime provides them, including tool metadata.
 - Stores consolidated memories with embeddings.
 - Searches memories semantically through PostgreSQL + pgvector.
+- Builds a small recommended context block for agents that want it.
 - Uses any OpenAI-compatible embeddings endpoint.
 - Runs as a Docker/Portainer stack.
 
@@ -48,6 +50,7 @@ sessions   -> conversation/session identity
 messages   -> raw user/assistant/tool turns
 memories   -> durable facts, decisions, preferences, project notes
 embedding  -> semantic vector for each memory
+metadata   -> tool calls/results and runtime fields attached to messages
 agent_id   -> memory namespace
 device_id  -> Hermes instance/profile that wrote the turn
 ```
@@ -119,7 +122,17 @@ GET  /v1/stats
 GET  /v1/consolidate/pending
 ```
 
-Current consolidation uses an OpenAI-compatible summarizer when `SUMMARIZER_BASE_URL` and `SUMMARIZER_MODEL` are configured. If the summarizer is not configured or fails, fast-brain falls back to extractive consolidation: it stores a compact transcript summary as a `summary` memory and marks raw messages as consolidated.
+Current consolidation uses an OpenAI-compatible summarizer when `SUMMARIZER_BASE_URL` and `SUMMARIZER_MODEL` are configured. Consolidation now claims only the pending message block that fits in `max_chars`, then marks only those message IDs as consolidated. Oversized single messages are marked `failed` instead of being silently truncated and treated as processed.
+
+If the summarizer is not configured or fails, fast-brain falls back to extractive consolidation for the claimed block only.
+
+Context selection endpoint:
+
+```txt
+POST /v1/context
+```
+
+It returns relevant memories plus recent session messages within a simple character budget. This is intentionally a recommendation layer first; full prompt pruning still depends on Hermes exposing a context-construction hook.
 
 Summarizer config example:
 
@@ -209,6 +222,7 @@ GET  /v1/sessions/{session_id}/recent
 POST /v1/memories
 DELETE /v1/memories/{id}?agent_id=hermes
 POST /v1/search
+POST /v1/context
 GET  /v1/consolidate/pending?agent_id=hermes
 POST /v1/consolidate/session/{session_id}
 POST /v1/compact

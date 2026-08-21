@@ -4,17 +4,19 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from .config import settings
 from .db import migrate
 from .embeddings import embed
-from .schemas import CompactIn, ConsolidateIn, MemoryIn, MemoryOut, MessageIn, SearchIn, SummarizerTestIn
+from .schemas import CompactIn, ConsolidateIn, ContextIn, MemoryIn, MemoryOut, MessageIn, SearchIn, SummarizerTestIn
 from .store import (
+    claim_unconsolidated_messages,
     delete_memory,
     mark_consolidated,
+    mark_failed,
+    mark_pending,
     pending_sessions,
     recent_messages,
     save_memory,
     save_message,
     search_memories,
     stats,
-    unconsolidated_messages,
 )
 from .summarizer import summarize_session
 
@@ -67,7 +69,7 @@ def get_pending(agent_id: str = "hermes", limit: int = 20) -> dict[str, object]:
 
 @app.post("/v1/messages", dependencies=[Depends(require_auth)])
 def add_message(message: MessageIn) -> dict[str, str]:
-    save_message(message.session_id, message.role, message.content, message.agent_id, message.device_id)
+    save_message(message.session_id, message.role, message.content, message.agent_id, message.device_id, message.metadata)
     return {"status": "stored"}
 
 
@@ -91,7 +93,31 @@ async def remember(memory: MemoryIn) -> dict[str, int]:
 
 @app.post("/v1/search", response_model=list[MemoryOut], dependencies=[Depends(require_auth)])
 async def search(search_input: SearchIn) -> list[dict[str, object]]:
-    return search_memories(await embed(search_input.query), search_input.agent_id, search_input.limit)
+    return search_memories(await embed(search_input.query), search_input.agent_id, search_input.limit, search_input.min_score)
+
+
+@app.post("/v1/context", dependencies=[Depends(require_auth)])
+async def build_context(request: ContextIn) -> dict[str, object]:
+    memories = search_memories(await embed(request.query), request.agent_id, request.memory_limit, request.min_score)
+    recent = recent_messages(request.session_id, request.recent_limit) if request.session_id else []
+    selected_memories, selected_recent, used = [], [], 0
+    for memory in memories:
+        size = len(memory["content"])
+        if used + size > request.max_chars:
+            continue
+        selected_memories.append(memory)
+        used += size
+    for message in reversed(recent):
+        size = len(message["content"])
+        if used + size > request.max_chars:
+            continue
+        selected_recent.append(message)
+        used += size
+    return {
+        "memories": selected_memories,
+        "recent_messages": list(reversed(selected_recent)),
+        "budget": {"used_chars": used, "max_chars": request.max_chars},
+    }
 
 
 @app.delete("/v1/memories/{memory_id}", dependencies=[Depends(require_auth)])
@@ -112,30 +138,39 @@ async def compact(request: CompactIn) -> dict[str, object]:
 
 
 async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> dict[str, object]:
-    messages = unconsolidated_messages(session_id)
+    messages = claim_unconsolidated_messages(session_id, request.max_chars)
     if not messages:
         return {"status": "empty", "memory_id": None, "messages": 0}
 
-    summary = await summarize_session(session_id, messages, request.max_chars)
-    memory_ids = []
-    for memory in summary["memories"]:
-        content = memory["content"][: request.max_chars]
-        memory_ids.append(
-            save_memory(
-                content,
-                await embed(content),
-                request.agent_id,
-                session_id,
-                memory.get("kind") or request.kind,
-                {
-                    "source": "consolidation",
-                    "message_count": len(messages),
-                    "mode": summary["mode"],
-                    "error": summary["error"],
-                },
+    message_ids = [message["id"] for message in messages]
+    try:
+        summary = await summarize_session(session_id, messages, request.max_chars)
+        memory_ids = []
+        for memory in summary["memories"]:
+            content = memory["content"][: request.max_chars]
+            memory_ids.append(
+                save_memory(
+                    content,
+                    await embed(content),
+                    request.agent_id,
+                    session_id,
+                    memory.get("kind") or request.kind,
+                    {
+                        "source": "consolidation",
+                        "message_count": len(messages),
+                        "message_ids": message_ids,
+                        "mode": summary["mode"],
+                        "error": summary["error"],
+                    },
+                )
             )
-        )
-    mark_consolidated([message["id"] for message in messages], memory_ids[0])
+        if not memory_ids:
+            mark_failed(message_ids)
+            return {"status": "failed", "session_id": session_id, "memory_ids": [], "messages": len(messages)}
+        mark_consolidated(message_ids, memory_ids[0])
+    except Exception:
+        mark_pending(message_ids)
+        raise
     return {
         "status": "consolidated",
         "session_id": session_id,
