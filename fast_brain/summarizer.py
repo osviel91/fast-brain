@@ -21,8 +21,12 @@ async def summarize_session(session_id: str, messages: list[dict[str, Any]], max
         "Extract durable memories from this Hermes conversation. "
         "Return only JSON: an array of objects with keys kind and content. "
         "Allowed kinds: project, decision, preference, task, fact, correction, summary. "
-        "Each content must be a standalone, specific sentence with enough context to be useful weeks later. "
-        "Prefer 1-6 high-signal memories. Skip trivial chatter, secrets, raw logs, and duplicates.\n\n"
+        "Each content must be a standalone, specific sentence useful weeks later. "
+        "Prefer 0-4 high-signal memories. Return [] if nothing durable exists. "
+        "Skip E2E/test probes, exact probe strings, raw logs, file listings, tool dumps, secrets, duplicates, "
+        "completed one-off tasks, temporary instructions, and obsolete setup states. "
+        "Use preference only for stable user preferences, not current configuration facts. "
+        "Use task only for unresolved future work.\n\n"
         f"Session: {session_id}\n{transcript}"
     )
     try:
@@ -43,8 +47,6 @@ async def summarize_session(session_id: str, messages: list[dict[str, Any]], max
         parsed = json.loads(text)
         items = parsed if isinstance(parsed, list) else [parsed]
         memories = [item for item in items if item.get("content")]
-        if memories:
-            return {"mode": "summarizer", "error": "", "memories": memories}
-        return {"mode": "fallback", "error": "summarizer returned no memories", "memories": extractive_summary(session_id, messages, max_chars)}
+        return {"mode": "summarizer", "error": "", "memories": memories}
     except Exception as exc:
         return {"mode": "fallback", "error": str(exc), "memories": extractive_summary(session_id, messages, max_chars)}

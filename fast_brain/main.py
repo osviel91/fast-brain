@@ -10,14 +10,15 @@ from .store import (
     delete_memory,
     failed_messages,
     mark_consolidated,
-    mark_failed,
     mark_pending,
     pending_sessions,
+    recent_memories,
     recent_messages,
     retry_failed_messages,
     save_memory,
     save_message,
     search_memories,
+    similar_memory,
     skip_failed_messages,
     stats,
 )
@@ -104,6 +105,11 @@ async def remember(memory: MemoryIn) -> dict[str, int]:
     return {"id": memory_id}
 
 
+@app.get("/v1/memories/recent", dependencies=[Depends(require_auth)])
+def get_recent_memories(agent_id: str = "hermes", limit: int = 20) -> dict[str, object]:
+    return {"memories": recent_memories(agent_id, limit)}
+
+
 @app.post("/v1/search", response_model=list[MemoryOut], dependencies=[Depends(require_auth)])
 async def search(search_input: SearchIn) -> list[dict[str, object]]:
     return search_memories(await embed(search_input.query), search_input.agent_id, search_input.limit, search_input.min_score)
@@ -174,12 +180,18 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
     try:
         summary = await summarize_session(session_id, messages, request.max_chars)
         memory_ids = []
+        skipped_duplicates = []
         for memory in summary["memories"]:
             content = memory["content"][: request.max_chars]
+            embedding = await embed(content)
+            duplicate = similar_memory(embedding, request.agent_id)
+            if duplicate:
+                skipped_duplicates.append(duplicate)
+                continue
             memory_ids.append(
                 save_memory(
                     content,
-                    await embed(content),
+                    embedding,
                     request.agent_id,
                     session_id,
                     memory.get("kind") or request.kind,
@@ -189,20 +201,19 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
                         "message_ids": message_ids,
                         "mode": summary["mode"],
                         "error": summary["error"],
+                        "skipped_duplicates": skipped_duplicates,
                     },
                 )
             )
-        if not memory_ids:
-            mark_failed(message_ids)
-            return {"status": "failed", "session_id": session_id, "memory_ids": [], "messages": len(messages)}
-        mark_consolidated(message_ids, memory_ids[0])
+        mark_consolidated(message_ids, memory_ids[0] if memory_ids else None)
     except Exception:
         mark_pending(message_ids)
         raise
     return {
-        "status": "consolidated",
+        "status": "consolidated" if memory_ids else ("deduplicated" if skipped_duplicates else "no_memories"),
         "session_id": session_id,
         "memory_ids": memory_ids,
+        "skipped_duplicates": skipped_duplicates,
         "mode": summary["mode"],
         "error": summary["error"],
         "messages": len(messages),

@@ -27,6 +27,8 @@ Implemented:
 - Safe block-based consolidation with per-message `consolidation_status`.
 - Search threshold through `min_score`.
 - Memory access tracking with `access_count` and `last_accessed_at`.
+- Near-duplicate consolidated memories are skipped before insert.
+- Recent memories can be reviewed through `/v1/memories/recent`.
 - Basic context recommendation endpoint: `POST /v1/context`.
 - Public endpoint configured through `https://fb-memory.osviel.duckdns.org`.
 - Manual compaction through `/v1/compact` and per-session consolidation endpoints.
@@ -60,6 +62,7 @@ Deliverables:
 - Tune default `min_score` with real Hermes sessions.
 - Add recency and usage signals to ranking.
 - Add simple deduplication before returning search results.
+- Keep insert-time deduplication for consolidated memories.
 - Add memory importance field only if real use shows the need.
 - Add manual memory correction workflow if bad memories appear.
 
@@ -115,8 +118,10 @@ Manual flow first:
 2. Check `/v1/consolidate/pending`.
 3. Run `/v1/compact` with a conservative `max_sessions`.
 4. Check `/v1/consolidate/failed`.
-5. Retry failed sessions only after choosing a larger `max_chars` or accepting that oversized tool outputs need separate handling.
-6. Skip failed oversized tool outputs when their raw content is not worth durable memory.
+5. Review `/v1/memories/recent`.
+6. Delete obsolete/noisy memories.
+7. Retry failed sessions only after choosing a larger `max_chars` or accepting that oversized tool outputs need separate handling.
+8. Skip failed oversized tool outputs when their raw content is not worth durable memory.
 
 Deliverables:
 

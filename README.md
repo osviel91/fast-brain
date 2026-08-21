@@ -9,6 +9,7 @@ External semantic memory for Hermes agents.
 - Stores consolidated memories with embeddings.
 - Searches memories semantically through PostgreSQL + pgvector.
 - Builds a small recommended context block for agents that want it.
+- Skips near-duplicate memories during consolidation.
 - Uses any OpenAI-compatible embeddings endpoint.
 - Runs as a Docker/Portainer stack.
 
@@ -173,6 +174,9 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
 curl -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   "$FAST_BRAIN_URL/v1/consolidate/failed?agent_id=hermes"
 
+curl -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  "$FAST_BRAIN_URL/v1/memories/recent?agent_id=hermes&limit=20"
+
 curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"agent_id":"hermes","kind":"summary","max_chars":12000}' \
@@ -183,6 +187,8 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
 ```
 
 Run manual compaction first. Add automatic compaction only after the pending/failed reports are boring and predictable.
+
+Memory hygiene rule: review recent memories after compacting. Delete obsolete or noisy memories before enabling automatic compaction.
 
 The lazy rule: do not summarize everything all the time. Keep raw messages cheap, consolidate only inactive/old sessions, and inject only memories that semantic search says are relevant.
 
@@ -236,6 +242,7 @@ POST /v1/summarizer/test
 POST /v1/messages
 GET  /v1/sessions/{session_id}/recent
 POST /v1/memories
+GET  /v1/memories/recent?agent_id=hermes
 DELETE /v1/memories/{id}?agent_id=hermes
 POST /v1/search
 POST /v1/context

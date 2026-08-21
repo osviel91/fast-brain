@@ -87,6 +87,49 @@ def search_memories(query_embedding: list[float], agent_id: str, limit: int, min
     ]
 
 
+def similar_memory(query_embedding: list[float], agent_id: str, min_score: float = 0.92) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT id, content, kind, 1 - (embedding <=> %s) AS score
+            FROM memories
+            WHERE agent_id = %s
+            ORDER BY score DESC
+            LIMIT 1
+            """,
+            (Vector(query_embedding), agent_id),
+        ).fetchone()
+    if not row or row[3] < min_score:
+        return None
+    return {"id": row[0], "content": row[1], "kind": row[2], "score": row[3]}
+
+
+def recent_memories(agent_id: str = "hermes", limit: int = 20) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, content, kind, metadata, access_count, last_accessed_at, created_at
+            FROM memories
+            WHERE agent_id = %s
+            ORDER BY id DESC
+            LIMIT %s
+            """,
+            (agent_id, limit),
+        ).fetchall()
+    return [
+        {
+            "id": row[0],
+            "content": row[1],
+            "kind": row[2],
+            "metadata": row[3],
+            "access_count": row[4],
+            "last_accessed_at": row[5],
+            "created_at": row[6],
+        }
+        for row in rows
+    ]
+
+
 def delete_memory(memory_id: int, agent_id: str) -> bool:
     with connect() as conn:
         row = conn.execute(
