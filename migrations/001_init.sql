@@ -49,4 +49,5 @@ ON memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS memories_agent_idx ON memories(agent_id);
 CREATE INDEX IF NOT EXISTS messages_session_idx ON messages(session_id, id);
+DROP INDEX IF EXISTS messages_unconsolidated_idx;
 CREATE INDEX IF NOT EXISTS messages_unconsolidated_idx ON messages(session_id, id) WHERE consolidation_status = 'pending';
