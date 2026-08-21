@@ -32,6 +32,7 @@ Implemented:
 - Basic context recommendation endpoint: `POST /v1/context`.
 - Public endpoint configured through `https://fb-memory.osviel.duckdns.org`.
 - Manual compaction through `/v1/compact` and per-session consolidation endpoints.
+- Safe external automatic compaction through `scripts/compact-once.sh`.
 
 ## Phase 1: Reliable Memory
 
@@ -132,7 +133,7 @@ Deliverables:
 - Compact old tool outputs into concise summaries.
 - Preserve current task, decisions, constraints and recent exchanges.
 - Add configurable retention for raw messages after safe consolidation.
-- Later: add automatic compaction once manual reports are stable.
+- Run automatic compaction externally with `scripts/compact-once.sh` once manual reports are stable.
 
 Acceptance checks:
 
@@ -141,6 +142,13 @@ Acceptance checks:
 - Context size does not grow without bound.
 - Automatic compaction does not run until manual compaction is proven safe.
 - Automatic compaction must never process sessions that are still active.
+
+Automatic flow:
+
+1. Schedule `scripts/compact-once.sh` every 30-60 minutes.
+2. Keep `FAST_BRAIN_COMPACT_MIN_AGE_MINUTES=60` or higher.
+3. Keep `FAST_BRAIN_COMPACT_MAX_SESSIONS` small.
+4. Review `/v1/consolidate/failed` and `/v1/memories/recent` after the first runs.
 
 ## Phase 6: Agent-Agnostic Layer
 

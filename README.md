@@ -194,6 +194,30 @@ Memory hygiene rule: review recent memories after compacting. Delete obsolete or
 
 The lazy rule: do not summarize everything all the time. Keep raw messages cheap, consolidate only inactive/old sessions, and inject only memories that semantic search says are relevant.
 
+Automatic compaction can be run from cron or another scheduler:
+
+```bash
+FAST_BRAIN_URL=https://fb-memory.osviel.duckdns.org \
+FAST_BRAIN_API_KEY=... \
+FAST_BRAIN_AGENT_ID=hermes \
+scripts/compact-once.sh
+```
+
+Conservative cron example:
+
+```cron
+*/30 * * * * cd /path/to/fast-brain && FAST_BRAIN_URL=https://fb-memory.osviel.duckdns.org FAST_BRAIN_API_KEY=... FAST_BRAIN_AGENT_ID=hermes scripts/compact-once.sh
+```
+
+Optional knobs:
+
+```env
+FAST_BRAIN_COMPACT_MAX_CHARS=12000
+FAST_BRAIN_COMPACT_MAX_SESSIONS=5
+FAST_BRAIN_COMPACT_MIN_AGE_MINUTES=60
+FAST_BRAIN_COMPACT_KIND=summary
+```
+
 ## Stack
 
 - FastAPI
