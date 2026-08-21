@@ -114,6 +114,7 @@ Compaction endpoints:
 
 ```txt
 POST /v1/consolidate/session/{session_id}
+POST /v1/compact
 GET  /v1/stats
 GET  /v1/consolidate/pending
 ```
@@ -133,6 +134,11 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"agent_id":"hermes","kind":"summary","max_chars":3000}' \
   "$FAST_BRAIN_URL/v1/consolidate/session/<session_id>"
+
+curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"hermes","kind":"summary","max_chars":3000,"max_sessions":10}' \
+  "$FAST_BRAIN_URL/v1/compact"
 ```
 
 The lazy rule: do not summarize everything all the time. Keep raw messages cheap, consolidate only inactive/old sessions, and inject only memories that semantic search says are relevant.
@@ -186,6 +192,7 @@ DELETE /v1/memories/{id}?agent_id=hermes
 POST /v1/search
 GET  /v1/consolidate/pending?agent_id=hermes
 POST /v1/consolidate/session/{session_id}
+POST /v1/compact
 POST /v1/consolidate
 ```
 

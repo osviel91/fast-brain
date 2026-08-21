@@ -31,6 +31,10 @@ class ConsolidateIn(BaseModel):
     max_chars: int = Field(default=3000, ge=500, le=12000)
 
 
+class CompactIn(ConsolidateIn):
+    max_sessions: int = Field(default=10, ge=1, le=100)
+
+
 class MemoryOut(BaseModel):
     id: int
     content: str

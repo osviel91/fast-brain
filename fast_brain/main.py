@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from .config import settings
 from .db import migrate
 from .embeddings import embed
-from .schemas import ConsolidateIn, MemoryIn, MemoryOut, MessageIn, SearchIn
+from .schemas import CompactIn, ConsolidateIn, MemoryIn, MemoryOut, MessageIn, SearchIn
 from .store import (
     delete_memory,
     mark_consolidated,
@@ -83,6 +83,17 @@ def forget(memory_id: int, agent_id: str = "hermes") -> dict[str, object]:
 
 @app.post("/v1/consolidate/session/{session_id}", dependencies=[Depends(require_auth)])
 async def consolidate_session(session_id: str, request: ConsolidateIn) -> dict[str, object]:
+    return await consolidate_one_session(session_id, request)
+
+
+@app.post("/v1/compact", dependencies=[Depends(require_auth)])
+async def compact(request: CompactIn) -> dict[str, object]:
+    sessions = pending_sessions(request.agent_id, request.max_sessions)
+    results = [await consolidate_one_session(session["session_id"], request) for session in sessions]
+    return {"status": "compacted", "sessions": len(results), "results": results}
+
+
+async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> dict[str, object]:
     messages = unconsolidated_messages(session_id)
     if not messages:
         return {"status": "empty", "memory_id": None, "messages": 0}
@@ -99,7 +110,7 @@ async def consolidate_session(session_id: str, request: ConsolidateIn) -> dict[s
         {"source": "consolidation", "message_count": len(messages)},
     )
     mark_consolidated([message["id"] for message in messages], memory_id)
-    return {"status": "consolidated", "memory_id": memory_id, "messages": len(messages)}
+    return {"status": "consolidated", "session_id": session_id, "memory_id": memory_id, "messages": len(messages)}
 
 
 @app.post("/v1/consolidate", dependencies=[Depends(require_auth)])
