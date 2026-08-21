@@ -103,6 +103,12 @@ class FastBrainProvider(MemoryProvider):
             return None
         return RecallStatus(provider_label="fast-brain", count=self._last_count)
 
+    def _message_metadata(self, message: dict[str, Any], index: int) -> dict[str, Any]:
+        keep = ("name", "tool_name", "tool_call_id", "finish_reason", "timestamp")
+        metadata = {key: message[key] for key in keep if key in message and message[key] is not None}
+        metadata["turn_index"] = index
+        return metadata
+
     def sync_turn(
         self,
         user_content: str,
@@ -122,6 +128,8 @@ class FastBrainProvider(MemoryProvider):
                 content = message.get("content")
                 if role not in {"user", "assistant", "system", "tool"} or content is None:
                     continue
+                if role == "assistant" and not str(content).strip():
+                    continue
                 self._request(
                     "POST",
                     "/v1/messages",
@@ -131,7 +139,7 @@ class FastBrainProvider(MemoryProvider):
                         "content": content if isinstance(content, str) else json.dumps(content, ensure_ascii=False),
                         "agent_id": self.agent_id,
                         "device_id": self.device_id,
-                        "metadata": {key: value for key, value in message.items() if key not in {"role", "content"}} | {"turn_index": index},
+                        "metadata": self._message_metadata(message, index),
                     },
                 )
                 stored = True

@@ -24,6 +24,7 @@ Implemented:
 - Automatic memory prefetch through `/v1/search`.
 - Explicit tools: `fb_search_memory`, `fb_remember`, `fb_forget`.
 - Full message metadata capture when Hermes provides runtime messages.
+- Hermes plugin stores minimal message metadata and skips empty assistant turns.
 - Safe block-based consolidation with per-message `consolidation_status`.
 - Search threshold through `min_score`.
 - Memory access tracking with `access_count` and `last_accessed_at`.
