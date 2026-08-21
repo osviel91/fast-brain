@@ -41,6 +41,7 @@ Deliverables:
 - Add a direct smoke command or script for memory provider checks.
 - Inspect failed consolidation messages with `/v1/consolidate/failed`.
 - Retry failed messages with `/v1/consolidate/session/{session_id}/retry-failed`.
+- Skip oversized failed tool outputs with `/v1/consolidate/session/{session_id}/skip-failed`.
 - Avoid duplicate message storage across Hermes restarts if possible.
 
 Acceptance checks:
@@ -115,6 +116,7 @@ Manual flow first:
 3. Run `/v1/compact` with a conservative `max_sessions`.
 4. Check `/v1/consolidate/failed`.
 5. Retry failed sessions only after choosing a larger `max_chars` or accepting that oversized tool outputs need separate handling.
+6. Skip failed oversized tool outputs when their raw content is not worth durable memory.
 
 Deliverables:
 

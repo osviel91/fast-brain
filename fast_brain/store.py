@@ -171,6 +171,20 @@ def retry_failed_messages(session_id: str) -> int:
     return len(row)
 
 
+def skip_failed_messages(session_id: str) -> int:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            UPDATE messages
+            SET consolidation_status = 'consolidated', consolidated_at = now(), consolidation_memory_id = NULL
+            WHERE session_id = %s AND consolidation_status = 'failed'
+            RETURNING id
+            """,
+            (session_id,),
+        ).fetchall()
+    return len(row)
+
+
 def claim_unconsolidated_messages(session_id: str, max_chars: int) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(

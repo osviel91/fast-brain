@@ -118,6 +118,7 @@ Compaction endpoints:
 ```txt
 POST /v1/consolidate/session/{session_id}
 POST /v1/consolidate/session/{session_id}/retry-failed
+POST /v1/consolidate/session/{session_id}/skip-failed
 POST /v1/compact
 GET  /v1/stats
 GET  /v1/consolidate/pending
@@ -176,6 +177,9 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"agent_id":"hermes","kind":"summary","max_chars":12000}' \
   "$FAST_BRAIN_URL/v1/consolidate/session/<session_id>/retry-failed"
+
+curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  "$FAST_BRAIN_URL/v1/consolidate/session/<session_id>/skip-failed"
 ```
 
 Run manual compaction first. Add automatic compaction only after the pending/failed reports are boring and predictable.
@@ -239,6 +243,7 @@ GET  /v1/consolidate/pending?agent_id=hermes
 GET  /v1/consolidate/failed?agent_id=hermes
 POST /v1/consolidate/session/{session_id}
 POST /v1/consolidate/session/{session_id}/retry-failed
+POST /v1/consolidate/session/{session_id}/skip-failed
 POST /v1/compact
 POST /v1/consolidate
 ```

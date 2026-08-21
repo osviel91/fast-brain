@@ -18,6 +18,7 @@ from .store import (
     save_memory,
     save_message,
     search_memories,
+    skip_failed_messages,
     stats,
 )
 from .summarizer import summarize_session
@@ -147,6 +148,11 @@ async def retry_failed(session_id: str, request: ConsolidateIn) -> dict[str, obj
     retried = retry_failed_messages(session_id)
     result = await consolidate_one_session(session_id, request) if retried else {"status": "empty", "messages": 0}
     return {"retried": retried, "result": result}
+
+
+@app.post("/v1/consolidate/session/{session_id}/skip-failed", dependencies=[Depends(require_auth)])
+def skip_failed(session_id: str) -> dict[str, object]:
+    return {"skipped": skip_failed_messages(session_id)}
 
 
 @app.post("/v1/compact", dependencies=[Depends(require_auth)])
