@@ -1,0 +1,6 @@
+name: fast-brain
+version: 0.1.0
+description: "fast-brain semantic memory provider"
+hooks:
+  - sync_turn
+  - prefetch

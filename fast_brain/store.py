@@ -31,6 +31,15 @@ def save_memory(
     metadata: dict[str, Any],
 ) -> int:
     with connect() as conn:
+        if session_id:
+            conn.execute(
+                """
+                INSERT INTO sessions (id, agent_id, updated_at)
+                VALUES (%s, %s, now())
+                ON CONFLICT (id) DO UPDATE SET updated_at = now()
+                """,
+                (session_id, agent_id),
+            )
         row = conn.execute(
             """
             INSERT INTO memories (content, embedding, agent_id, session_id, kind, metadata)
