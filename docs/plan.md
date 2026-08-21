@@ -76,6 +76,8 @@ Acceptance checks:
 
 Purpose: make `/v1/context` the preferred context source for agents.
 
+Plugin deployment note: any change under `plugins/fast-brain/` must be copied or redeployed to every Hermes host/profile using that plugin. Backend redeploy alone is not enough.
+
 Deliverables:
 
 - Update Hermes plugin `prefetch` to optionally use `/v1/context`.
