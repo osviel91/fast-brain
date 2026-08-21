@@ -154,7 +154,7 @@ def stats(agent_id: str = "hermes") -> dict[str, int]:
     return {"sessions": row[0], "messages": row[1], "unconsolidated_messages": row[2], "memories": row[3]}
 
 
-def pending_sessions(agent_id: str = "hermes", limit: int = 20) -> list[dict[str, Any]]:
+def pending_sessions(agent_id: str = "hermes", limit: int = 20, min_age_minutes: int = 0) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(
             """
@@ -163,10 +163,11 @@ def pending_sessions(agent_id: str = "hermes", limit: int = 20) -> list[dict[str
             JOIN messages m ON m.session_id = s.id
             WHERE s.agent_id = %s AND m.consolidation_status = 'pending'
             GROUP BY s.id
+            HAVING max(m.created_at) <= now() - (%s * interval '1 minute')
             ORDER BY max(m.created_at)
             LIMIT %s
             """,
-            (agent_id, limit),
+            (agent_id, min_age_minutes, limit),
         ).fetchall()
     return [
         {"session_id": row[0], "unconsolidated_messages": row[1], "first_message_at": row[2], "last_message_at": row[3]}

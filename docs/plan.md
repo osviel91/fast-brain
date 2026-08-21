@@ -118,7 +118,7 @@ Manual flow first:
 
 1. Check `/v1/stats`.
 2. Check `/v1/consolidate/pending`.
-3. Run `/v1/compact` with a conservative `max_sessions`.
+3. Run `/v1/compact` with a conservative `max_sessions` and `min_age_minutes=60` or higher.
 4. Check `/v1/consolidate/failed`.
 5. Review `/v1/memories/recent`.
 6. Delete obsolete/noisy memories.
@@ -128,6 +128,7 @@ Manual flow first:
 Deliverables:
 
 - Detect sessions with high pending message volume.
+- Skip active sessions by default using `min_age_minutes`.
 - Compact old tool outputs into concise summaries.
 - Preserve current task, decisions, constraints and recent exchanges.
 - Add configurable retention for raw messages after safe consolidation.
@@ -139,6 +140,7 @@ Acceptance checks:
 - Raw messages are retained until safely consolidated.
 - Context size does not grow without bound.
 - Automatic compaction does not run until manual compaction is proven safe.
+- Automatic compaction must never process sessions that are still active.
 
 ## Phase 6: Agent-Agnostic Layer
 

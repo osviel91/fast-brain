@@ -168,7 +168,7 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
 
 curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"agent_id":"hermes","kind":"summary","max_chars":3000,"max_sessions":10}' \
+  -d '{"agent_id":"hermes","kind":"summary","max_chars":3000,"max_sessions":10,"min_age_minutes":60}' \
   "$FAST_BRAIN_URL/v1/compact"
 
 curl -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
@@ -186,7 +186,9 @@ curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
   "$FAST_BRAIN_URL/v1/consolidate/session/<session_id>/skip-failed"
 ```
 
-Run manual compaction first. Add automatic compaction only after the pending/failed reports are boring and predictable.
+Run manual compaction first. `/v1/compact` defaults to `min_age_minutes=60` so active Hermes sessions are skipped. Use `min_age_minutes=0` only when compacting a known inactive session manually.
+
+Add automatic compaction only after the pending/failed reports are boring and predictable.
 
 Memory hygiene rule: review recent memories after compacting. Delete obsolete or noisy memories before enabling automatic compaction.
 

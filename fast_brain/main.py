@@ -72,8 +72,8 @@ async def test_summarizer(request: SummarizerTestIn) -> dict[str, object]:
 
 
 @app.get("/v1/consolidate/pending", dependencies=[Depends(require_auth)])
-def get_pending(agent_id: str = "hermes", limit: int = 20) -> dict[str, object]:
-    return {"sessions": pending_sessions(agent_id, limit)}
+def get_pending(agent_id: str = "hermes", limit: int = 20, min_age_minutes: int = 0) -> dict[str, object]:
+    return {"sessions": pending_sessions(agent_id, limit, min_age_minutes)}
 
 
 @app.get("/v1/consolidate/failed", dependencies=[Depends(require_auth)])
@@ -163,9 +163,9 @@ def skip_failed(session_id: str) -> dict[str, object]:
 
 @app.post("/v1/compact", dependencies=[Depends(require_auth)])
 async def compact(request: CompactIn) -> dict[str, object]:
-    sessions = pending_sessions(request.agent_id, request.max_sessions)
+    sessions = pending_sessions(request.agent_id, request.max_sessions, request.min_age_minutes)
     results = [await consolidate_one_session(session["session_id"], request) for session in sessions]
-    return {"status": "compacted", "sessions": len(results), "results": results}
+    return {"status": "compacted", "sessions": len(results), "min_age_minutes": request.min_age_minutes, "results": results}
 
 
 async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> dict[str, object]:

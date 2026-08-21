@@ -35,6 +35,7 @@ class ConsolidateIn(BaseModel):
 
 class CompactIn(ConsolidateIn):
     max_sessions: int = Field(default=10, ge=1, le=100)
+    min_age_minutes: int = Field(default=60, ge=0, le=10080)
 
 
 class SummarizerTestIn(BaseModel):
