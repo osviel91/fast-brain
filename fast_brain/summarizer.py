@@ -21,7 +21,8 @@ async def summarize_session(session_id: str, messages: list[dict[str, Any]], max
         "Extract durable memories from this Hermes conversation. "
         "Return only JSON: an array of objects with keys kind and content. "
         "Allowed kinds: project, decision, preference, task, fact, correction, summary. "
-        "Skip trivial chatter, secrets, raw logs, and duplicates. Keep each content concise.\n\n"
+        "Each content must be a standalone, specific sentence with enough context to be useful weeks later. "
+        "Prefer 1-6 high-signal memories. Skip trivial chatter, secrets, raw logs, and duplicates.\n\n"
         f"Session: {session_id}\n{transcript}"
     )
     try:
@@ -38,9 +39,9 @@ async def summarize_session(session_id: str, messages: list[dict[str, Any]], max
             response.raise_for_status()
         text = response.json()["choices"][0]["message"]["content"].strip()
         if text.startswith("```"):
-            text = text.strip("`")
-            text = text.removeprefix("json").strip()
-        items = json.loads(text)
+            text = text.strip("`").removeprefix("json").strip()
+        parsed = json.loads(text)
+        items = parsed if isinstance(parsed, list) else [parsed]
         memories = [item for item in items if item.get("content")]
         if memories:
             return {"mode": "summarizer", "error": "", "memories": memories}
