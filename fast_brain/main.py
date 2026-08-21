@@ -5,7 +5,7 @@ from .config import settings
 from .db import migrate
 from .embeddings import embed
 from .schemas import MemoryIn, MemoryOut, MessageIn, SearchIn
-from .store import recent_messages, save_memory, save_message, search_memories
+from .store import delete_memory, recent_messages, save_memory, save_message, search_memories
 
 app = FastAPI(title="fast-brain", version="0.1.0")
 
@@ -54,6 +54,11 @@ async def remember(memory: MemoryIn) -> dict[str, int]:
 @app.post("/v1/search", response_model=list[MemoryOut], dependencies=[Depends(require_auth)])
 async def search(search_input: SearchIn) -> list[dict[str, object]]:
     return search_memories(await embed(search_input.query), search_input.agent_id, search_input.limit)
+
+
+@app.delete("/v1/memories/{memory_id}", dependencies=[Depends(require_auth)])
+def forget(memory_id: int, agent_id: str = "hermes") -> dict[str, object]:
+    return {"deleted": delete_memory(memory_id, agent_id)}
 
 
 @app.post("/v1/consolidate", dependencies=[Depends(require_auth)])

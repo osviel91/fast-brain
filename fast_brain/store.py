@@ -69,6 +69,15 @@ def search_memories(query_embedding: list[float], agent_id: str, limit: int) -> 
     ]
 
 
+def delete_memory(memory_id: int, agent_id: str) -> bool:
+    with connect() as conn:
+        row = conn.execute(
+            "DELETE FROM memories WHERE id = %s AND agent_id = %s RETURNING id",
+            (memory_id, agent_id),
+        ).fetchone()
+    return row is not None
+
+
 def recent_messages(session_id: str, limit: int = 20) -> list[dict[str, str]]:
     with connect() as conn:
         rows = conn.execute(

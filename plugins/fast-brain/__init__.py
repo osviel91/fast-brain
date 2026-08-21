@@ -144,6 +144,17 @@ class FastBrainProvider(MemoryProvider):
                     "required": ["content"],
                 },
             },
+            {
+                "name": "fb_forget",
+                "description": "Delete a fast-brain memory by id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                    },
+                    "required": ["id"],
+                },
+            },
         ]
 
     def handle_tool_call(self, tool_name: str, args: dict[str, Any], **kwargs: Any) -> str:
@@ -166,10 +177,13 @@ class FastBrainProvider(MemoryProvider):
                 },
             )
             return json.dumps(result, ensure_ascii=False)
+        if tool_name == "fb_forget":
+            result = self._request("DELETE", f"/v1/memories/{args['id']}?agent_id={self.agent_id}", {})
+            return json.dumps(result, ensure_ascii=False)
         raise NotImplementedError(tool_name)
 
     def _request(self, method: str, path: str, payload: dict[str, Any]) -> Any:
-        data = json.dumps(payload).encode()
+        data = None if method == "DELETE" else json.dumps(payload).encode()
         request = urllib.request.Request(
             f"{self.url}{path}",
             data=data,
