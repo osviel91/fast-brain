@@ -110,13 +110,29 @@ decision: fast-brain uses PostgreSQL + pgvector and OpenAI-compatible embeddings
 task: Add memory lifecycle management and compaction policy.
 ```
 
-Future compaction endpoints:
+Compaction endpoints:
 
 ```txt
 POST /v1/consolidate/session/{session_id}
-POST /v1/compact?older_than_days=30
 GET  /v1/stats
-GET  /v1/memories?agent_id=hermes
+GET  /v1/consolidate/pending
+```
+
+Current consolidation is extractive: it stores a compact transcript summary as a `summary` memory and marks raw messages as consolidated. This proves the lifecycle without adding another LLM dependency. Replace the summarizer later with a local or cheap model once the API shape is stable.
+
+Manual compaction flow:
+
+```bash
+curl -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  "$FAST_BRAIN_URL/v1/stats?agent_id=hermes"
+
+curl -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  "$FAST_BRAIN_URL/v1/consolidate/pending?agent_id=hermes"
+
+curl -X POST -H "Authorization: Bearer $FAST_BRAIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id":"hermes","kind":"summary","max_chars":3000}' \
+  "$FAST_BRAIN_URL/v1/consolidate/session/<session_id>"
 ```
 
 The lazy rule: do not summarize everything all the time. Keep raw messages cheap, consolidate only inactive/old sessions, and inject only memories that semantic search says are relevant.
@@ -162,11 +178,14 @@ EMBEDDINGS_MODEL=mock
 
 ```txt
 GET  /health
+GET  /v1/stats?agent_id=hermes
 POST /v1/messages
 GET  /v1/sessions/{session_id}/recent
 POST /v1/memories
 DELETE /v1/memories/{id}?agent_id=hermes
 POST /v1/search
+GET  /v1/consolidate/pending?agent_id=hermes
+POST /v1/consolidate/session/{session_id}
 POST /v1/consolidate
 ```
 

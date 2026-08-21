@@ -13,8 +13,13 @@ CREATE TABLE IF NOT EXISTS messages (
     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
     content TEXT NOT NULL,
+    consolidated_at TIMESTAMPTZ,
+    consolidation_memory_id BIGINT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS consolidated_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS consolidation_memory_id BIGINT;
 
 CREATE TABLE IF NOT EXISTS memories (
     id BIGSERIAL PRIMARY KEY,
@@ -33,3 +38,4 @@ ON memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS memories_agent_idx ON memories(agent_id);
 CREATE INDEX IF NOT EXISTS messages_session_idx ON messages(session_id, id);
+CREATE INDEX IF NOT EXISTS messages_unconsolidated_idx ON messages(session_id, id) WHERE consolidated_at IS NULL;

@@ -25,6 +25,12 @@ class SearchIn(BaseModel):
     limit: int = Field(default=5, ge=1, le=20)
 
 
+class ConsolidateIn(BaseModel):
+    agent_id: str = "hermes"
+    kind: str = "summary"
+    max_chars: int = Field(default=3000, ge=500, le=12000)
+
+
 class MemoryOut(BaseModel):
     id: int
     content: str

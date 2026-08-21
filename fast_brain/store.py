@@ -78,6 +78,63 @@ def delete_memory(memory_id: int, agent_id: str) -> bool:
     return row is not None
 
 
+def stats(agent_id: str = "hermes") -> dict[str, int]:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                (SELECT count(*) FROM sessions WHERE agent_id = %s),
+                (SELECT count(*) FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.agent_id = %s),
+                (SELECT count(*) FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.agent_id = %s AND m.consolidated_at IS NULL),
+                (SELECT count(*) FROM memories WHERE agent_id = %s)
+            """,
+            (agent_id, agent_id, agent_id, agent_id),
+        ).fetchone()
+    return {"sessions": row[0], "messages": row[1], "unconsolidated_messages": row[2], "memories": row[3]}
+
+
+def pending_sessions(agent_id: str = "hermes", limit: int = 20) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT s.id, count(m.id), min(m.created_at), max(m.created_at)
+            FROM sessions s
+            JOIN messages m ON m.session_id = s.id
+            WHERE s.agent_id = %s AND m.consolidated_at IS NULL
+            GROUP BY s.id
+            ORDER BY max(m.created_at)
+            LIMIT %s
+            """,
+            (agent_id, limit),
+        ).fetchall()
+    return [
+        {"session_id": row[0], "unconsolidated_messages": row[1], "first_message_at": row[2], "last_message_at": row[3]}
+        for row in rows
+    ]
+
+
+def unconsolidated_messages(session_id: str) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, role, content
+            FROM messages
+            WHERE session_id = %s AND consolidated_at IS NULL
+            ORDER BY id
+            """,
+            (session_id,),
+        ).fetchall()
+    return [{"id": row[0], "role": row[1], "content": row[2]} for row in rows]
+
+
+def mark_consolidated(message_ids: list[int], memory_id: int) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE messages SET consolidated_at = now(), consolidation_memory_id = %s WHERE id = ANY(%s)",
+            (memory_id, message_ids),
+        )
+
+
 def recent_messages(session_id: str, limit: int = 20) -> list[dict[str, str]]:
     with connect() as conn:
         rows = conn.execute(
