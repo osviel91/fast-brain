@@ -39,6 +39,14 @@ EMBEDDINGS_DIMENSIONS=1536
 
 `EMBEDDINGS_BASE_URL` must be the API root, not the full `/embeddings` URL.
 
+For local testing without a remote embedding model:
+
+```env
+EMBEDDINGS_BASE_URL=mock://local
+EMBEDDINGS_API_KEY=local
+EMBEDDINGS_MODEL=mock
+```
+
 ## Endpoints
 
 ```txt

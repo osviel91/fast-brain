@@ -1,5 +1,6 @@
 from typing import Any
 
+from pgvector import Vector
 from psycopg.types.json import Jsonb
 
 from .db import connect
@@ -36,7 +37,7 @@ def save_memory(
             VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (content, embedding, agent_id, session_id, kind, Jsonb(metadata)),
+            (content, Vector(embedding), agent_id, session_id, kind, Jsonb(metadata)),
         ).fetchone()
     return row[0]
 
@@ -51,7 +52,7 @@ def search_memories(query_embedding: list[float], agent_id: str, limit: int) -> 
             ORDER BY embedding <=> %s
             LIMIT %s
             """,
-            (query_embedding, agent_id, query_embedding, limit),
+            (Vector(query_embedding), agent_id, Vector(query_embedding), limit),
         ).fetchall()
     return [
         {"id": row[0], "content": row[1], "kind": row[2], "metadata": row[3], "score": row[4]}
