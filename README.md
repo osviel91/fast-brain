@@ -119,7 +119,21 @@ GET  /v1/stats
 GET  /v1/consolidate/pending
 ```
 
-Current consolidation is extractive: it stores a compact transcript summary as a `summary` memory and marks raw messages as consolidated. This proves the lifecycle without adding another LLM dependency. Replace the summarizer later with a local or cheap model once the API shape is stable.
+Current consolidation uses an OpenAI-compatible summarizer when `SUMMARIZER_BASE_URL` and `SUMMARIZER_MODEL` are configured. If the summarizer is not configured or fails, fast-brain falls back to extractive consolidation: it stores a compact transcript summary as a `summary` memory and marks raw messages as consolidated.
+
+Summarizer config example:
+
+```env
+SUMMARIZER_BASE_URL=http://host.docker.internal:11434/v1
+SUMMARIZER_API_KEY=local
+SUMMARIZER_MODEL=qwen2.5:7b
+```
+
+Expected memory kinds:
+
+```txt
+project, decision, preference, task, fact, correction, summary
+```
 
 Manual compaction flow:
 
@@ -168,6 +182,9 @@ EMBEDDINGS_BASE_URL=https://api.openai.com/v1
 EMBEDDINGS_API_KEY=change-me
 EMBEDDINGS_MODEL=text-embedding-3-small
 EMBEDDINGS_DIMENSIONS=1536
+SUMMARIZER_BASE_URL=
+SUMMARIZER_API_KEY=
+SUMMARIZER_MODEL=
 ```
 
 `EMBEDDINGS_BASE_URL` must be the API root, not the full `/embeddings` URL.

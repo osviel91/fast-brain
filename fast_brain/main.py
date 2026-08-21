@@ -16,6 +16,7 @@ from .store import (
     stats,
     unconsolidated_messages,
 )
+from .summarizer import summarize_session
 
 app = FastAPI(title="fast-brain", version="0.1.0")
 
@@ -98,19 +99,27 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
     if not messages:
         return {"status": "empty", "memory_id": None, "messages": 0}
 
-    lines = [f"{message['role']}: {message['content']}" for message in messages]
-    content = f"Session {session_id} summary:\n" + "\n".join(lines)
-    content = content[: request.max_chars]
-    memory_id = save_memory(
-        content,
-        await embed(content),
-        request.agent_id,
-        session_id,
-        request.kind,
-        {"source": "consolidation", "message_count": len(messages)},
-    )
-    mark_consolidated([message["id"] for message in messages], memory_id)
-    return {"status": "consolidated", "session_id": session_id, "memory_id": memory_id, "messages": len(messages)}
+    memories = await summarize_session(session_id, messages, request.max_chars)
+    memory_ids = []
+    for memory in memories:
+        content = memory["content"][: request.max_chars]
+        memory_ids.append(
+            save_memory(
+                content,
+                await embed(content),
+                request.agent_id,
+                session_id,
+                memory.get("kind") or request.kind,
+                {"source": "consolidation", "message_count": len(messages)},
+            )
+        )
+    mark_consolidated([message["id"] for message in messages], memory_ids[0])
+    return {
+        "status": "consolidated",
+        "session_id": session_id,
+        "memory_ids": memory_ids,
+        "messages": len(messages),
+    }
 
 
 @app.post("/v1/consolidate", dependencies=[Depends(require_auth)])

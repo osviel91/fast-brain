@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     embeddings_api_key: str = Field(validation_alias="EMBEDDINGS_API_KEY")
     embeddings_model: str = Field(validation_alias="EMBEDDINGS_MODEL")
     embeddings_dimensions: int = Field(default=1536, validation_alias="EMBEDDINGS_DIMENSIONS")
+    summarizer_base_url: str = Field(default="", validation_alias="SUMMARIZER_BASE_URL")
+    summarizer_api_key: str = Field(default="", validation_alias="SUMMARIZER_API_KEY")
+    summarizer_model: str = Field(default="", validation_alias="SUMMARIZER_MODEL")
 
 
 settings = Settings()
