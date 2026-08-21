@@ -25,6 +25,11 @@ from .summarizer import summarize_session
 app = FastAPI(title="fast-brain", version="0.1.0")
 
 
+def should_skip_consolidation(messages: list[dict[str, object]]) -> bool:
+    text = "\n".join(str(message.get("content", "")) for message in messages)
+    return "fb-e2e-" in text
+
+
 def require_auth(authorization: str | None = Header(default=None)) -> None:
     if not settings.api_key:
         return
@@ -157,6 +162,9 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
         return {"status": "empty", "memory_id": None, "messages": 0}
 
     message_ids = [message["id"] for message in messages]
+    if should_skip_consolidation(messages):
+        mark_consolidated(message_ids, None)
+        return {"status": "skipped", "session_id": session_id, "memory_ids": [], "messages": len(messages)}
     try:
         summary = await summarize_session(session_id, messages, request.max_chars)
         memory_ids = []

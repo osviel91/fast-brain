@@ -199,7 +199,7 @@ def claim_unconsolidated_messages(session_id: str, max_chars: int) -> list[dict[
     return [{"id": row[0], "role": row[1], "content": row[2], "metadata": row[3]} for row in claimed]
 
 
-def mark_consolidated(message_ids: list[int], memory_id: int) -> None:
+def mark_consolidated(message_ids: list[int], memory_id: int | None) -> None:
     with connect() as conn:
         conn.execute(
             """
