@@ -35,6 +35,11 @@ class CompactIn(ConsolidateIn):
     max_sessions: int = Field(default=10, ge=1, le=100)
 
 
+class SummarizerTestIn(BaseModel):
+    text: str
+    max_chars: int = Field(default=3000, ge=100, le=12000)
+
+
 class MemoryOut(BaseModel):
     id: int
     content: str

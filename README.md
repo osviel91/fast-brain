@@ -202,6 +202,8 @@ EMBEDDINGS_MODEL=mock
 ```txt
 GET  /health
 GET  /v1/stats?agent_id=hermes
+GET  /v1/config
+POST /v1/summarizer/test
 POST /v1/messages
 GET  /v1/sessions/{session_id}/recent
 POST /v1/memories

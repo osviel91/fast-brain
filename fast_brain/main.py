@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from .config import settings
 from .db import migrate
 from .embeddings import embed
-from .schemas import CompactIn, ConsolidateIn, MemoryIn, MemoryOut, MessageIn, SearchIn
+from .schemas import CompactIn, ConsolidateIn, MemoryIn, MemoryOut, MessageIn, SearchIn, SummarizerTestIn
 from .store import (
     delete_memory,
     mark_consolidated,
@@ -41,6 +41,23 @@ def health() -> dict[str, str]:
 @app.get("/v1/stats", dependencies=[Depends(require_auth)])
 def get_stats(agent_id: str = "hermes") -> dict[str, int]:
     return stats(agent_id)
+
+
+@app.get("/v1/config", dependencies=[Depends(require_auth)])
+def get_config() -> dict[str, object]:
+    return {
+        "embeddings_dimensions": settings.embeddings_dimensions,
+        "summarizer_configured": bool(settings.summarizer_base_url and settings.summarizer_model),
+        "summarizer_base_url": settings.summarizer_base_url,
+        "summarizer_model": settings.summarizer_model,
+    }
+
+
+@app.post("/v1/summarizer/test", dependencies=[Depends(require_auth)])
+async def test_summarizer(request: SummarizerTestIn) -> dict[str, object]:
+    messages = [{"id": 0, "role": "user", "content": request.text}]
+    result = await summarize_session("summarizer-test", messages, request.max_chars)
+    return result
 
 
 @app.get("/v1/consolidate/pending", dependencies=[Depends(require_auth)])
@@ -99,9 +116,9 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
     if not messages:
         return {"status": "empty", "memory_id": None, "messages": 0}
 
-    memories = await summarize_session(session_id, messages, request.max_chars)
+    summary = await summarize_session(session_id, messages, request.max_chars)
     memory_ids = []
-    for memory in memories:
+    for memory in summary["memories"]:
         content = memory["content"][: request.max_chars]
         memory_ids.append(
             save_memory(
@@ -110,7 +127,12 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
                 request.agent_id,
                 session_id,
                 memory.get("kind") or request.kind,
-                {"source": "consolidation", "message_count": len(messages)},
+                {
+                    "source": "consolidation",
+                    "message_count": len(messages),
+                    "mode": summary["mode"],
+                    "error": summary["error"],
+                },
             )
         )
     mark_consolidated([message["id"] for message in messages], memory_ids[0])
@@ -118,6 +140,8 @@ async def consolidate_one_session(session_id: str, request: ConsolidateIn) -> di
         "status": "consolidated",
         "session_id": session_id,
         "memory_ids": memory_ids,
+        "mode": summary["mode"],
+        "error": summary["error"],
         "messages": len(messages),
     }
 

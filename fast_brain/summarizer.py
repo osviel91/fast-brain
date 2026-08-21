@@ -12,9 +12,9 @@ def extractive_summary(session_id: str, messages: list[dict[str, Any]], max_char
     return [{"kind": "summary", "content": content}]
 
 
-async def summarize_session(session_id: str, messages: list[dict[str, Any]], max_chars: int) -> list[dict[str, Any]]:
+async def summarize_session(session_id: str, messages: list[dict[str, Any]], max_chars: int) -> dict[str, Any]:
     if not (settings.summarizer_base_url and settings.summarizer_model):
-        return extractive_summary(session_id, messages, max_chars)
+        return {"mode": "fallback", "error": "summarizer not configured", "memories": extractive_summary(session_id, messages, max_chars)}
 
     transcript = "\n".join(f"{message['role']}: {message['content']}" for message in messages)[:max_chars]
     prompt = (
@@ -42,6 +42,8 @@ async def summarize_session(session_id: str, messages: list[dict[str, Any]], max
             text = text.removeprefix("json").strip()
         items = json.loads(text)
         memories = [item for item in items if item.get("content")]
-        return memories or extractive_summary(session_id, messages, max_chars)
-    except Exception:
-        return extractive_summary(session_id, messages, max_chars)
+        if memories:
+            return {"mode": "summarizer", "error": "", "memories": memories}
+        return {"mode": "fallback", "error": "summarizer returned no memories", "memories": extractive_summary(session_id, messages, max_chars)}
+    except Exception as exc:
+        return {"mode": "fallback", "error": str(exc), "memories": extractive_summary(session_id, messages, max_chars)}
