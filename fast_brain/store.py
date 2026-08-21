@@ -292,3 +292,32 @@ def recent_messages(session_id: str, limit: int = 20) -> list[dict[str, Any]]:
             (session_id, limit),
         ).fetchall()
     return [{"role": role, "content": content, "metadata": metadata} for role, content, metadata in reversed(rows)]
+
+
+def session_overview(session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, role, length(content), left(replace(content, E'\n', ' '), 240), metadata,
+                   consolidation_status, created_at
+            FROM messages
+            WHERE session_id = %s
+            ORDER BY id DESC
+            LIMIT %s
+            """,
+            (session_id, limit),
+        ).fetchall()
+    return [
+        {
+            "id": row[0],
+            "role": row[1],
+            "chars": row[2],
+            "preview": row[3],
+            "metadata_keys": sorted((row[4] or {}).keys()),
+            "tool_name": (row[4] or {}).get("tool_name") or (row[4] or {}).get("name"),
+            "turn_index": (row[4] or {}).get("turn_index"),
+            "consolidation_status": row[5],
+            "created_at": row[6],
+        }
+        for row in reversed(rows)
+    ]

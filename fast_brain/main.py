@@ -18,6 +18,7 @@ from .store import (
     save_memory,
     save_message,
     search_memories,
+    session_overview,
     similar_memory,
     skip_failed_messages,
     stats,
@@ -90,6 +91,11 @@ def add_message(message: MessageIn) -> dict[str, str]:
 @app.get("/v1/sessions/{session_id}/recent", dependencies=[Depends(require_auth)])
 def get_recent(session_id: str, limit: int = 20) -> dict[str, object]:
     return {"messages": recent_messages(session_id, limit)}
+
+
+@app.get("/v1/sessions/{session_id}/overview", dependencies=[Depends(require_auth)])
+def get_session_overview(session_id: str, limit: int = 50) -> dict[str, object]:
+    return {"messages": session_overview(session_id, limit)}
 
 
 @app.post("/v1/memories", dependencies=[Depends(require_auth)])

@@ -267,6 +267,7 @@ GET  /v1/config
 POST /v1/summarizer/test
 POST /v1/messages
 GET  /v1/sessions/{session_id}/recent
+GET  /v1/sessions/{session_id}/overview
 POST /v1/memories
 GET  /v1/memories/recent?agent_id=hermes
 DELETE /v1/memories/{id}?agent_id=hermes

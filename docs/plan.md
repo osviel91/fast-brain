@@ -30,6 +30,7 @@ Implemented:
 - Memory access tracking with `access_count` and `last_accessed_at`.
 - Near-duplicate consolidated memories are skipped before insert.
 - Recent memories can be reviewed through `/v1/memories/recent`.
+- Session message sizes and tool metadata can be reviewed through `/v1/sessions/{session_id}/overview` without dumping full tool outputs.
 - Basic context recommendation endpoint: `POST /v1/context`.
 - Public endpoint configured through `https://fb-memory.osviel.duckdns.org`.
 - Manual compaction through `/v1/compact` and per-session consolidation endpoints.
